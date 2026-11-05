@@ -1,20 +1,17 @@
-id: example
-name: Example
-version: "0.1.0"
+id: messengers
+name: Messengers
+version: "1.0.0"
 hubra: ">=0.2,<1"
-description: "A starting point for a Hubra plugin: one table, an API, a screen and a test."
+description: "Announcements in the club's Telegram, Signal or Matrix group: new events, posts and polls, and reminders."
 author: Hubra
-homepage: https://github.com/hubra-app/hubra-plugins-template
+homepage: https://github.com/hubra-app/hubra-plugin-messengers
 license: AGPL-3.0-or-later
-tags: [example]
-package: hubra_example
-modules: [example]
+tags: [communication, telegram, signal, matrix]
+package: hubra_messengers
+modules: [messengers]
 requires: [members]
 migrations: migrations
 frontend: frontend/dist/plugin.js
 # The areas this plugin extends; Hubra refuses a plugin that touches one it
 # doesn't list. See docs/plugins.md in hubra-app/hubra.
-uses: [routes, tables, settings, nav, frontend]
-# Other plugins it needs, with a version range, e.g.
-# depends:
-#   finance: ">=2.0,<3"
+uses: [routes, tables, settings, events, jobs, nav, frontend]

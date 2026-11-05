@@ -1,22 +1,14 @@
 import { registerPlugin } from '@hubra/plugin-sdk'
-import { IconNote } from '@tabler/icons-react'
-import { NotesScreen } from './NotesScreen'
+import { IconMessages } from '@tabler/icons-react'
+import { MessengersScreen } from './MessengersScreen'
 import translations from './translations.json'
 
-// Everything here shows only while the module is on for the club and the
-// person has `perm`. Other places to add things: `tabs` (a tab on a built-in
-// screen) and `slots` (account.cards, inventory.item, settings.module.actions).
 registerPlugin({
-  id: 'example',
+  id: 'messengers',
   routes: [
-    {
-      path: 'example',
-      module: 'example',
-      perm: 'example.notes.read',
-      component: NotesScreen,
-    },
+    { path: 'messengers', module: 'messengers', perm: 'messengers.channels.update', component: MessengersScreen },
   ],
-  // The nav entry in hubra_example/__init__.py names this icon.
-  icons: { note: IconNote },
+  // The nav entry in hubra_messengers/__init__.py names this icon.
+  icons: { messages: IconMessages },
   translations,
 })

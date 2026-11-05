@@ -1,28 +1,108 @@
 {
   "en-GB": {
-    "shell": { "nav": { "example": "Notice board" } },
-    "example": {
-      "title": "Notice board",
-      "desc": "Short notes for the whole club",
-      "placeholder": "Write a note…",
-      "add": "Post note",
-      "saved": "Note posted",
-      "delete": "Delete note",
-      "loading": "Loading…",
-      "empty": "No notes yet."
+    "shell": {
+      "nav": {
+        "messengers": "Messengers"
+      }
+    },
+    "roles": {
+      "perms": {
+        "messengers_channels_update": "See what went to the club's messengers and send a test message"
+      }
+    },
+    "messengers": {
+      "title": "Messengers",
+      "desc": "New events, posts and polls in the club's Telegram, Signal or Matrix group.",
+      "settings": "Settings",
+      "ready": "Set up",
+      "notSetUp": "Not set up",
+      "lastSent": "Last message {{when}}",
+      "nothingYet": "Nothing sent yet.",
+      "lastError": "Last failure: {{error}}",
+      "howTo": {
+        "telegram": "Create a bot with @BotFather, add it to your group, then enter its token and the chat in the settings.",
+        "signal": "Needs a signal-cli REST API with a registered number; enter its address, the number and the group in the settings.",
+        "matrix": "Enter the homeserver, an access token of the club's account and the room ID in the settings."
+      },
+      "test": "Send a test message",
+      "sentToast": "Sent to {{name}}",
+      "failedToast": "{{name}}: {{error}}",
+      "whatTitle": "What is posted",
+      "nothingOn": "Nothing: every switch is off",
+      "membersOnlyOn": "Members-only events are posted too; events, posts and polls for some groups never are.",
+      "membersOnlyOff": "Only public events; events, posts and polls for some groups never.",
+      "kind": {
+        "event": "new events",
+        "post": "new posts",
+        "poll": "new polls",
+        "reminder": "reminders",
+        "test": "test"
+      },
+      "logTitle": "Sent messages",
+      "logEmpty": "Nothing sent yet.",
+      "when": "When",
+      "where": "Where",
+      "what": "What",
+      "state": "State",
+      "status": {
+        "queued": "Waiting",
+        "sent": "Sent",
+        "failed": "Failed"
+      },
+      "retry": "Try again"
     }
   },
   "de-CH": {
-    "shell": { "nav": { "example": "Pinnwand" } },
-    "example": {
-      "title": "Pinnwand",
-      "desc": "Kurze Notizen für den ganzen Verein",
-      "placeholder": "Notiz schreiben …",
-      "add": "Notiz posten",
-      "saved": "Notiz gepostet",
-      "delete": "Notiz löschen",
-      "loading": "Wird geladen …",
-      "empty": "Noch keine Notizen."
+    "shell": {
+      "nav": {
+        "messengers": "Messenger"
+      }
+    },
+    "roles": {
+      "perms": {
+        "messengers_channels_update": "Sehen, was an die Messenger des Vereins ging, und eine Testnachricht senden"
+      }
+    },
+    "messengers": {
+      "title": "Messenger",
+      "desc": "Neue Anlässe, Beiträge und Umfragen in der Telegram-, Signal- oder Matrix-Gruppe des Vereins.",
+      "settings": "Einstellungen",
+      "ready": "Eingerichtet",
+      "notSetUp": "Nicht eingerichtet",
+      "lastSent": "Letzte Nachricht {{when}}",
+      "nothingYet": "Noch nichts gesendet.",
+      "lastError": "Zuletzt fehlgeschlagen: {{error}}",
+      "howTo": {
+        "telegram": "Erstelle mit @BotFather einen Bot, füge ihn eurer Gruppe hinzu und trage Token und Chat in den Einstellungen ein.",
+        "signal": "Braucht eine signal-cli REST API mit registrierter Nummer; trage Adresse, Nummer und Gruppe in den Einstellungen ein.",
+        "matrix": "Trage Homeserver, ein Access-Token des Vereinskontos und die Raum-ID in den Einstellungen ein."
+      },
+      "test": "Testnachricht senden",
+      "sentToast": "An {{name}} gesendet",
+      "failedToast": "{{name}}: {{error}}",
+      "whatTitle": "Was gepostet wird",
+      "nothingOn": "Nichts: alle Schalter sind aus",
+      "membersOnlyOn": "Auch Anlässe nur für Mitglieder; Anlässe, Beiträge und Umfragen nur für einzelne Gruppen nie.",
+      "membersOnlyOff": "Nur öffentliche Anlässe; Anlässe, Beiträge und Umfragen nur für einzelne Gruppen nie.",
+      "kind": {
+        "event": "neue Anlässe",
+        "post": "neue Beiträge",
+        "poll": "neue Umfragen",
+        "reminder": "Erinnerungen",
+        "test": "Test"
+      },
+      "logTitle": "Gesendete Nachrichten",
+      "logEmpty": "Noch nichts gesendet.",
+      "when": "Wann",
+      "where": "Wo",
+      "what": "Was",
+      "state": "Stand",
+      "status": {
+        "queued": "Wartet",
+        "sent": "Gesendet",
+        "failed": "Fehlgeschlagen"
+      },
+      "retry": "Nochmals"
     }
   }
 }
