@@ -53,7 +53,7 @@ export function MessengersScreen() {
         title={t('messengers.title')}
         desc={t('messengers.desc')}
         actions={
-          <Button variant="default" leftSection={<IconSettings size={16} />} onClick={() => navigate('/app/settings/modules')}>
+          <Button variant="default" leftSection={<IconSettings size={16} />} onClick={() => navigate('/app/settings/modules?module=messengers')}>
             {t('messengers.settings')}
           </Button>
         }
