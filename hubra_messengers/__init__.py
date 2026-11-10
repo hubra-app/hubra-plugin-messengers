@@ -36,7 +36,7 @@ module = Module(
             "/app/messengers",
             "shell.nav.messengers",
             "messages",
-            section="more",
+            section="communication",
             order=34,
             perms=("messengers.channels.update",),
         ),

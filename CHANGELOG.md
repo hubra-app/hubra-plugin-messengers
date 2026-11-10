@@ -1,5 +1,11 @@
 # Messengers
 
+## Unreleased
+
+- The menu entry moves to the new sidebar area **Kommunikation**, next to Mail,
+  Letters and Inbox. Needs a Hubra with that area (after 0.2.5); older
+  versions show it under a heading of its own.
+
 ## 1.0.1
 
 The Einstellungen button on the Messengers page opens the plugin's own
