@@ -7,19 +7,26 @@ API with an access token (PUT …/rooms/<room>/send/m.room.message/<txn>).
 
 Signal and Matrix addresses come from the club, so they are checked before
 every call: https only, no redirects, and the host must resolve to public
-addresses. A platform can allow private hosts by name (a signal-cli
-container next to Hubra) with MESSENGERS_PRIVATE_HOSTS.
+addresses. The connection then goes to the address that was checked, so a
+name that resolves differently a moment later (DNS rebinding) can't steer
+it into a private network. A platform can allow private hosts by name (a
+signal-cli container next to Hubra) with MESSENGERS_PRIVATE_HOSTS.
+
+No error says more than the HTTP status and the server's own short reason:
+the Telegram token is part of the address and the others are headers, so
+messages from http.client must never reach the board or the logs.
 """
 
 from __future__ import annotations
 
+import http.client
 import ipaddress
 import json
 import os
+import re
 import socket
-import urllib.error
+import ssl
 import urllib.parse
-import urllib.request
 import uuid
 
 from .messages import Message
@@ -32,40 +39,88 @@ class SendError(Exception):
     """Shown to the board, so it never carries a token."""
 
 
-class _NoRedirect(urllib.request.HTTPRedirectHandler):
-    def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: D102
-        return None
+MAX_BODY = 1 << 20  # what is read of a reply; ours are a few hundred bytes
+USER_AGENT = "Hubra-Messengers/1"
+_TELEGRAM_TOKEN = re.compile(r"^[0-9]+:[A-Za-z0-9_-]+$")
 
 
-_opener = urllib.request.build_opener(_NoRedirect)
+class _Pinned(http.client.HTTPSConnection):
+    """Connects to an address checked beforehand, with SNI and the
+    certificate check for the host name."""
+
+    def __init__(self, host: str, ip: str, port: int):
+        super().__init__(
+            host, port, timeout=TIMEOUT, context=ssl.create_default_context()
+        )
+        self._ip = ip
+
+    def connect(self) -> None:
+        sock = socket.create_connection((self._ip, self.port), self.timeout)
+        self.sock = self._context.wrap_socket(sock, server_hostname=self.host)
+
+
+def _connection(url: str) -> tuple[http.client.HTTPConnection, str]:
+    parts = urllib.parse.urlsplit(url)
+    host = (parts.hostname or "").lower()
+    if not host:
+        raise SendError("the address is missing")
+    try:
+        port = parts.port
+    except ValueError:
+        raise SendError("the address's port is not valid") from None
+    path = (parts.path or "/") + (f"?{parts.query}" if parts.query else "")
+    if host in _private_ok():
+        if parts.scheme == "http":
+            return http.client.HTTPConnection(host, port, timeout=TIMEOUT), path
+        if parts.scheme != "https":
+            raise SendError("the address must start with https://")
+        return http.client.HTTPSConnection(host, port, timeout=TIMEOUT), path
+    if parts.scheme != "https":
+        raise SendError("the address must start with https://")
+    port = port or 443
+    return _Pinned(host, _public_ips(host, port)[0], port), path
+
+
+def _reason(raw: bytes) -> str:
+    try:
+        got = json.loads(raw or b"{}")
+        return str(
+            got.get("description") or got.get("error") or got.get("errcode") or ""
+        )[:200]
+    except (ValueError, AttributeError):
+        return ""
 
 
 def _request(method: str, url: str, body: dict, headers: dict | None = None) -> dict:
-    """One JSON call; tests replace this."""
+    """One JSON call; tests replace this. Follows no redirect."""
     data = json.dumps(body).encode()
-    req = urllib.request.Request(
-        url,
-        data=data,
-        method=method,
-        headers={"Content-Type": "application/json", **(headers or {})},
-    )
     try:
-        with _opener.open(req, timeout=TIMEOUT) as resp:
-            raw = resp.read()
-    except urllib.error.HTTPError as exc:
-        detail = ""
+        conn, path = _connection(url)
         try:
-            got = json.loads(exc.read() or b"{}")
-            detail = str(
-                got.get("description") or got.get("error") or got.get("errcode") or ""
-            )[:200]
-        except (ValueError, AttributeError):
-            pass
-        raise SendError(
-            f"HTTP {int(exc.code)}" + (f": {detail}" if detail else "")
-        ) from None
-    except (urllib.error.URLError, TimeoutError, OSError):
+            conn.request(
+                method,
+                path,
+                body=data,
+                headers={
+                    "Content-Type": "application/json",
+                    "User-Agent": USER_AGENT,
+                    **(headers or {}),
+                },
+            )
+            resp = conn.getresponse()
+            status, raw = resp.status, resp.read(MAX_BODY)
+        finally:
+            conn.close()
+    except SendError:
+        raise
+    except (OSError, TimeoutError):  # incl. ssl and socket errors
         raise SendError("the server can't be reached") from None
+    except (ValueError, http.client.HTTPException):
+        # e.g. a token with a space or a line break; the message holds it
+        raise SendError("the request couldn't be sent; check the settings") from None
+    if status >= 300:
+        detail = _reason(raw)
+        raise SendError(f"HTTP {int(status)}" + (f": {detail}" if detail else ""))
     try:
         return json.loads(raw) if raw else {}
     except ValueError:
@@ -95,15 +150,39 @@ def check_url(raw: str) -> str:
         raise SendError("the address must start with https://")
     if parts.username or parts.password:
         raise SendError("the address must not contain a user name or password")
+    if any(c.isspace() for c in url):
+        raise SendError("the address must not contain spaces")
     try:
-        infos = socket.getaddrinfo(host, parts.port or 443, proto=socket.IPPROTO_TCP)
-    except (socket.gaierror, UnicodeError):
+        port = parts.port or 443
+    except ValueError:
+        raise SendError("the address's port is not valid") from None
+    _public_ips(host, port)
+    return url
+
+
+def _public_ips(host: str, port: int) -> list[str]:
+    """The host's addresses, or SendError when one of them isn't public."""
+    try:
+        infos = socket.getaddrinfo(host, port, proto=socket.IPPROTO_TCP)
+    except (OSError, UnicodeError):
         raise SendError("the address's host is unknown") from None
+    ips = []
     for info in infos:
         ip = ipaddress.ip_address(info[4][0])
         if not ip.is_global:
             raise SendError("the address points into a private network")
-    return url
+        ips.append(str(ip))
+    if not ips:
+        raise SendError("the address's host is unknown")
+    return ips
+
+
+def _token(cfg: dict, key: str) -> str:
+    """A token as it goes into a header: no spaces or line breaks."""
+    value = str(cfg.get(key) or "").strip()
+    if any(c.isspace() or ord(c) < 32 or ord(c) == 127 for c in value):
+        raise SendError("the token doesn't look right")
+    return value
 
 
 def telegram(cfg: dict, msg: Message) -> str:
@@ -111,7 +190,7 @@ def telegram(cfg: dict, msg: Message) -> str:
         str(cfg.get("telegram_token") or "").strip(),
         str(cfg.get("telegram_chat") or "").strip(),
     )
-    if ":" not in token or "/" in token:
+    if not _TELEGRAM_TOKEN.match(token):
         raise SendError("the bot token doesn't look right")
     got = _request(
         "POST",
@@ -133,8 +212,8 @@ def telegram(cfg: dict, msg: Message) -> str:
 def signal(cfg: dict, msg: Message) -> str:
     base = check_url(str(cfg.get("signal_url") or ""))
     headers = {}
-    if cfg.get("signal_token"):
-        headers["Authorization"] = f"Bearer {str(cfg['signal_token']).strip()}"
+    if token := _token(cfg, "signal_token"):
+        headers["Authorization"] = f"Bearer {token}"
     got = _request(
         "POST",
         f"{base}/v2/send",
@@ -161,7 +240,7 @@ def matrix(cfg: dict, msg: Message) -> str:
             "format": "org.matrix.custom.html",
             "formatted_body": msg.html().replace("\n", "<br>"),
         },
-        {"Authorization": f"Bearer {str(cfg.get('matrix_token') or '').strip()}"},
+        {"Authorization": f"Bearer {_token(cfg, 'matrix_token')}"},
     )
     return str(got.get("event_id") or "")
 

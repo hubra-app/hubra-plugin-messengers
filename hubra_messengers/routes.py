@@ -132,6 +132,7 @@ def test():
 @messengers_bp.post("/log/<int:row_id>/retry")
 @permission_required("channels", "update", LABEL)
 def retry(row_id: int):
+    member = get_current_member()
     row, err = _get(MessengersLog, row_id)
     if err:
         return err
@@ -143,5 +144,6 @@ def retry(row_id: int):
     row.status, row.tries = "queued", 0
     if not services.deliver(row, cfg):
         row.status = "failed"
+    log_audit(member.id, "messengers.retry", "MessengersLog", row.id, row.channel)
     db.session.commit()
     return jsonify(_row(row))
