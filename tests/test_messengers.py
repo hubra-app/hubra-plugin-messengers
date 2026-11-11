@@ -200,3 +200,86 @@ def test_board_page_and_test_message(client, club):
     log = client.get(f"{BASE}/log?channel=telegram").get_json()
     assert [r["kind"] for r in log] == ["test"]
     assert client.get(f"{BASE}/status").get_json()["channels"][0]["lastSentAt"]
+
+
+def test_connects_to_the_checked_address(monkeypatch):
+    """The name is resolved once and the connection goes to that address,
+    so a second answer pointing inside (DNS rebinding) is never used."""
+    from hubra_messengers import transports
+
+    answers = iter(["93.184.215.14", "127.0.0.1"])
+    monkeypatch.setattr(
+        transports.socket,
+        "getaddrinfo",
+        lambda host, *a, **k: [(0, 0, 0, "", (next(answers), 443))],
+    )
+    dialled = []
+
+    def connect(addr, timeout=None):
+        dialled.append(addr)
+        raise OSError("refused")
+
+    monkeypatch.setattr(transports.socket, "create_connection", connect)
+    with pytest.raises(transports.SendError, match="can't be reached"):
+        transports._request("PUT", "https://matrix.example.org/x", {})
+    assert dialled == [("93.184.215.14", 443)]
+
+
+def test_tokens_never_show_in_errors(monkeypatch):
+    """A token with a space or a line break makes http.client fail with the
+    token in its message; that message must not come out."""
+    from hubra_messengers import transports
+    from hubra_messengers.messages import Message
+
+    monkeypatch.setattr(
+        transports.socket,
+        "getaddrinfo",
+        lambda host, *a, **k: [(0, 0, 0, "", ("93.184.215.14", 443))],
+    )
+    msg = Message("Hallo")
+    for cfg, send in (
+        ({"telegram_token": "123:abc def", "telegram_chat": "@x"}, transports.telegram),
+        (
+            {
+                "matrix_homeserver": "https://matrix.example.org",
+                "matrix_room": "!r:x",
+                "matrix_token": "mx-secret\r\nX-Evil: 1",
+            },
+            transports.matrix,
+        ),
+        (
+            {
+                "signal_url": "https://signal.example.org",
+                "signal_token": "sig secret",
+            },
+            transports.signal,
+        ),
+    ):
+        with pytest.raises(transports.SendError) as exc:
+            send(cfg, msg)
+        assert "secret" not in str(exc.value) and "abc" not in str(exc.value)
+    # Whatever http.client refuses comes out as a plain SendError.
+    with pytest.raises(transports.SendError, match="check the settings"):
+        transports._request(
+            "POST", "https://api.example.org/bot1:a b/send", {}, {"X": "ok"}
+        )
+    with pytest.raises(transports.SendError, match="port"):
+        transports.check_url("https://matrix.example.org:99999")
+
+
+def test_one_test_message_a_minute(client, club):
+    _login(client, "tom@test.ch")
+    first = client.post(f"{BASE}/test", json={"channel": "telegram"})
+    assert first.status_code == 200 and "Tom" not in str(club["sent"])
+    assert client.post(f"{BASE}/test", json={"channel": "telegram"}).status_code == 429
+    # Each messenger counts on its own.
+    assert client.post(f"{BASE}/test", json={"channel": "matrix"}).status_code == 200
+
+
+def test_posts_and_polls_off_by_default():
+    from hubra_messengers import module
+
+    defaults = {s.key: s.default for s in module.settings}
+    assert defaults["announce_events"] is True
+    assert defaults["announce_posts"] is False
+    assert defaults["announce_polls"] is False
