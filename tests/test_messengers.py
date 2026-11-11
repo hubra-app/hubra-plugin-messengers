@@ -265,3 +265,21 @@ def test_tokens_never_show_in_errors(monkeypatch):
         )
     with pytest.raises(transports.SendError, match="port"):
         transports.check_url("https://matrix.example.org:99999")
+
+
+def test_one_test_message_a_minute(client, club):
+    _login(client, "tom@test.ch")
+    first = client.post(f"{BASE}/test", json={"channel": "telegram"})
+    assert first.status_code == 200 and "Tom" not in str(club["sent"])
+    assert client.post(f"{BASE}/test", json={"channel": "telegram"}).status_code == 429
+    # Each messenger counts on its own.
+    assert client.post(f"{BASE}/test", json={"channel": "matrix"}).status_code == 200
+
+
+def test_posts_and_polls_off_by_default():
+    from hubra_messengers import module
+
+    defaults = {s.key: s.default for s in module.settings}
+    assert defaults["announce_events"] is True
+    assert defaults["announce_posts"] is False
+    assert defaults["announce_polls"] is False

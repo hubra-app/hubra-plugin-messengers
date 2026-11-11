@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- **Posts and polls are off by default.** They are meant for members and a
+  messenger group may be open to anyone; a club switches them on in the
+  settings. Clubs that already saved their settings keep what they chose.
+- One test message per messenger a minute (429 otherwise); the test message
+  no longer names who sent it (the audit log does).
+- Security: calls go to the address that passed the public-address check
+  (no DNS rebinding), a token with a space or line break gives a plain
+  error instead of a server error with the token in the log, and retrying
+  a failed message is audited.
 - The menu entry moves to the new sidebar area **Kommunikation**, next to Mail,
   Letters and Inbox. Needs a Hubra with that area (after 0.2.5); older
   versions show it under a heading of its own.

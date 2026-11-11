@@ -2,11 +2,13 @@
 
 GET  /status            which messengers are set up and what is announced
 GET  /log               the last 100 messages (?channel=telegram|signal|matrix)
-POST /test              {channel}: sends a test message now
+POST /test              {channel}: sends a test message now (one a minute)
 POST /log/<id>/retry    tries a failed message again
 """
 
 from __future__ import annotations
+
+from datetime import timedelta
 
 from flask import Blueprint, jsonify, request
 from sqlalchemy import select
@@ -25,6 +27,7 @@ from .models import MessengersLog
 messengers_bp = Blueprint("messengers_bp", __name__)
 
 LABEL = "See what went to the club's messengers and send a test message"
+TEST_EVERY = timedelta(minutes=1)  # each test lands in the club's group
 
 
 @messengers_bp.errorhandler(Invalid)
@@ -105,9 +108,20 @@ def test():
     cfg = services.config()
     if channel not in transports.configured(cfg):
         return api_error("NOT_SET_UP", "Fill in this messenger's settings first.", 409)
+    recent = db.session.scalar(
+        select(MessengersLog.id)
+        .where(MessengersLog.channel == channel)
+        .where(MessengersLog.kind == "test")
+        .where(MessengersLog.created_at > services.now() - TEST_EVERY)
+        .limit(1)
+    )
+    if recent:
+        return api_error(
+            "TOO_MANY_TESTS", "One test message a minute; try again shortly.", 429
+        )
     msg = Message(
         "👋 Test aus Hubra",
-        [f"Gesendet von {member.name}"],
+        [],  # no name: the log row would keep it after the member is deleted
         "Hier erscheinen neue Anlässe, Beiträge und Umfragen des Vereins.",
         club_url("/app/dashboard"),
     )

@@ -7,8 +7,12 @@ signal-cli REST API, or a Matrix account and room. Only what the whole club
 may see is posted: members-only events only when the club says its groups
 are for members, and nothing meant for some groups only.
 
+Posts and polls are only posted once the club switches them on, since they
+are meant for members.
+
 Permission:
     messengers.channels.update   see what was sent and send a test message
+                                 (one per messenger a minute)
 """
 
 from hubra.core.modules import Blueprint, Module, NavItem, Schedule, SettingField
@@ -43,8 +47,22 @@ module = Module(
     ),
     settings=(
         SettingField("announce_events", "bool", default=True, label="Post new events"),
-        SettingField("announce_posts", "bool", default=True, label="Post new posts"),
-        SettingField("announce_polls", "bool", default=True, label="Post new polls"),
+        # Posts and polls are for members; a messenger group may be open to
+        # anyone, so the club switches these on itself.
+        SettingField(
+            "announce_posts",
+            "bool",
+            default=False,
+            label="Post new posts",
+            description="Posts are for members: only when every group below is too",
+        ),
+        SettingField(
+            "announce_polls",
+            "bool",
+            default=False,
+            label="Post new polls",
+            description="Polls are for members: only when every group below is too",
+        ),
         SettingField(
             "announce_reminders",
             "bool",
