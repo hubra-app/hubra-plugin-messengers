@@ -7,16 +7,21 @@ API with an access token (PUT …/rooms/<room>/send/m.room.message/<txn>).
 
 Signal and Matrix addresses come from the club, so they are checked before
 every call: https only, no redirects, and the host must resolve to public
-addresses. A platform can allow private hosts by name (a signal-cli
-container next to Hubra) with MESSENGERS_PRIVATE_HOSTS.
+addresses. The connection then goes to the very address that was checked,
+so a DNS answer that changes between the check and the call (DNS
+rebinding) can't point Hubra into its own network. A platform can allow
+private hosts by name (a signal-cli container next to Hubra) with
+MESSENGERS_PRIVATE_HOSTS. An answer is read up to MAX_ANSWER bytes only.
 """
 
 from __future__ import annotations
 
+import http.client
 import ipaddress
 import json
 import os
 import socket
+import ssl
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -25,6 +30,8 @@ import uuid
 from .messages import Message
 
 TIMEOUT = 20
+# The answers are small JSON documents; more than this is not one.
+MAX_ANSWER = 1024 * 1024
 CHANNELS = ("telegram", "signal", "matrix")
 
 
@@ -37,7 +44,42 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
-_opener = urllib.request.build_opener(_NoRedirect)
+def _checked_address(host: str, port: int) -> str:
+    """The address to connect to: every address *host* resolves to must be
+    public, unless the platform allowed the host by name."""
+    try:
+        infos = socket.getaddrinfo(host, port, proto=socket.IPPROTO_TCP)
+    except (socket.gaierror, UnicodeError):
+        raise SendError("the address's host is unknown") from None
+    addresses = [info[4][0] for info in infos]
+    if not addresses:
+        raise SendError("the address's host is unknown")
+    if (host or "").lower() not in _private_ok():
+        for address in addresses:
+            if not ipaddress.ip_address(address).is_global:
+                raise SendError("the address points into a private network")
+    return addresses[0]
+
+
+class _CheckedHTTPS(http.client.HTTPSConnection):
+    """Connects to the address checked at connect time, with SNI and the
+    certificate check for the host name."""
+
+    def connect(self) -> None:
+        address = _checked_address(self.host, self.port)
+        sock = socket.create_connection((address, self.port), self.timeout)
+        self.sock = self._context.wrap_socket(sock, server_hostname=self.host)
+
+
+class _CheckedHTTPSHandler(urllib.request.HTTPSHandler):
+    def https_open(self, req):
+        return self.do_open(_CheckedHTTPS, req, context=ssl.create_default_context())
+
+
+# No proxy from the environment: the checked address is the one connected to.
+_opener = urllib.request.build_opener(
+    urllib.request.ProxyHandler({}), _NoRedirect, _CheckedHTTPSHandler
+)
 
 
 def _request(method: str, url: str, body: dict, headers: dict | None = None) -> dict:
@@ -51,11 +93,13 @@ def _request(method: str, url: str, body: dict, headers: dict | None = None) -> 
     )
     try:
         with _opener.open(req, timeout=TIMEOUT) as resp:
-            raw = resp.read()
+            raw = resp.read(MAX_ANSWER + 1)
+        if len(raw) > MAX_ANSWER:
+            raise SendError("the server's answer is too large")
     except urllib.error.HTTPError as exc:
         detail = ""
         try:
-            got = json.loads(exc.read() or b"{}")
+            got = json.loads(exc.read(MAX_ANSWER) or b"{}")
             detail = str(
                 got.get("description") or got.get("error") or got.get("errcode") or ""
             )[:200]
@@ -95,14 +139,7 @@ def check_url(raw: str) -> str:
         raise SendError("the address must start with https://")
     if parts.username or parts.password:
         raise SendError("the address must not contain a user name or password")
-    try:
-        infos = socket.getaddrinfo(host, parts.port or 443, proto=socket.IPPROTO_TCP)
-    except (socket.gaierror, UnicodeError):
-        raise SendError("the address's host is unknown") from None
-    for info in infos:
-        ip = ipaddress.ip_address(info[4][0])
-        if not ip.is_global:
-            raise SendError("the address points into a private network")
+    _checked_address(host, parts.port or 443)
     return url
 
 

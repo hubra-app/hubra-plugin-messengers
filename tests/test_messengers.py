@@ -200,3 +200,25 @@ def test_board_page_and_test_message(client, club):
     log = client.get(f"{BASE}/log?channel=telegram").get_json()
     assert [r["kind"] for r in log] == ["test"]
     assert client.get(f"{BASE}/status").get_json()["channels"][0]["lastSentAt"]
+
+
+def test_the_call_goes_to_the_checked_address(monkeypatch):
+    # DNS rebinding: the name was public when the settings were saved (or
+    # at check_url), and points into Hubra's own network at the call. The
+    # connection checks the address it actually connects to.
+    from hubra_messengers import transports
+
+    answers = iter(["93.184.215.14", "127.0.0.1"])
+    monkeypatch.setattr(
+        transports.socket,
+        "getaddrinfo",
+        lambda host, *a, **k: [(0, 0, 0, "", (next(answers), 443))],
+    )
+    monkeypatch.setattr(
+        transports.socket,
+        "create_connection",
+        lambda *a, **k: pytest.fail("connected to a private address"),
+    )
+    with pytest.raises(transports.SendError, match="private network"):
+        url = transports.check_url("https://matrix.example.org")
+        transports._request("POST", f"{url}/x", {})
