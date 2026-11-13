@@ -4,7 +4,7 @@
 
 A plugin for [Hubra](https://hubra.club). Announcements in the club's Telegram, Signal or Matrix group: new events, posts and polls, and reminders before an event or before a poll closes.
 
-**Version** 1.0.1 · **Works with** Hubra >=0.2,<1 · **Plugin id** `messengers` · **Needs** the members module
+**Version** 1.0.2 · **Works with** Hubra >=0.2,<1 · **Plugin id** `messengers` · **Needs** the members module
 
 ![The Messengers page](docs/screenshots/messengers.png)
 

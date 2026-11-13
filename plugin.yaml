@@ -1,6 +1,6 @@
 id: messengers
 name: Messengers
-version: "1.0.1"
+version: "1.0.2"
 hubra: ">=0.2,<1"
 description: "Announcements in the club's Telegram, Signal or Matrix group: new events, posts and polls, and reminders."
 author: Hubra

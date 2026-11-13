@@ -1,6 +1,6 @@
 # Messengers
 
-## Unreleased
+## 1.0.2
 
 - **Posts and polls are off by default.** They are meant for members and a
   messenger group may be open to anyone; a club switches them on in the
